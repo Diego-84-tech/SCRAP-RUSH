@@ -60,3 +60,150 @@
   #arcade-mode .boost{background:radial-gradient(#385021ee,#111a0ff0);border:2px solid #b6eb62;width:73px;height:73px}
   #arcade-mode .toolbar,#arcade-mode .hud{background:#101820}
 }
+
+/* Phone shell and work orders */
+[hidden]{display:none!important}
+html{background:#141b1c}
+body{margin:0;background:radial-gradient(ellipse at top,#303b38,#141b1c 72%);min-height:100dvh}
+main{width:auto;max-width:none;margin:0}
+#shift-board{min-height:100dvh;display:grid;place-items:center;padding:max(14px,env(safe-area-inset-top)) 14px max(14px,env(safe-area-inset-bottom))}
+.ticket{width:min(100%,420px);padding:clamp(14px,4vw,25px);background:#eeead8;color:#242d29;border-radius:10px;box-shadow:0 14px 40px #0006}
+.ticket-brand,.ticket-footer{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ticket-brand strong,.ticket-brand span,.ticket-footer span{font:700 11px ui-monospace,monospace;letter-spacing:.06em}
+.ticket-brand{border-bottom:1px dashed #6c7669;padding-bottom:11px}
+.ticket h1{font:700 clamp(36px,10vw,52px)/.95 'Barlow Condensed',Impact,sans-serif;letter-spacing:.015em;margin:15px 0}
+.ticket fieldset{border:0;margin:0;padding:0;min-width:0;display:grid;gap:7px}
+.ticket legend{font-size:13px;margin-bottom:6px;color:#475348}
+.ticket label{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 11px;min-height:61px;border:1px solid #a0a696;border-radius:5px;cursor:pointer;background:#f6f2e4}
+.ticket label:has(input:checked){background:#e3eeaf;border-color:#41542b}
+.ticket input{margin:0;accent-color:#536b2f;width:16px;height:16px}
+.ticket label strong,.ticket label small{display:block}
+.ticket label strong{font-size:16px}.ticket label small{font-size:12px;color:#475348}
+.ticket label b{font:700 11px ui-monospace,monospace;white-space:nowrap}
+.ticket .primary{width:100%;min-height:48px;margin:12px 0 7px;background:#d7f75b;color:#1d2618}
+.ticket-footer{border-top:1px dashed #6c7669;margin-top:5px}
+.ticket-footer button{min-height:44px;color:#28332a;border:0;padding:0 6px}
+.on-shift{overflow:hidden;overscroll-behavior:none;background:#101619;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+.on-shift main{height:100dvh;padding:env(safe-area-inset-top) max(5px,env(safe-area-inset-right)) env(safe-area-inset-bottom) max(5px,env(safe-area-inset-left))}
+#arcade-mode,#forklift-mode{height:100%;min-height:0;position:relative;display:flex;flex-direction:column;background:#111a20}
+.run-bar,.shift-hud,.pit-strip{display:flex;align-items:center;gap:8px;padding:3px 8px;border:0;border-bottom:1px solid #4b5345;background:#141c20}
+.run-bar #best{font:700 11px ui-monospace,monospace;color:var(--lime);margin-right:auto}
+.run-bar button,.shift-hud button,.pit-strip button,#arcade-board,.clockout button{min-height:44px;padding:4px 9px}
+.shift-hud>div{margin-right:auto}.shift-hud span{font-size:12px;margin-top:1px}
+#arcade-mode .hud{flex:none;padding:5px 9px;gap:8px;background:#182329}
+#arcade-mode .hud small{margin-bottom:0;font-size:9px}
+#arcade-mode .hud b{font-size:24px}
+#arcade-mode .arena,#shift-view{flex:1;min-height:0;aspect-ratio:auto;height:auto;position:relative;padding:0;background:#151d22}
+#arcade-mode .arena{display:grid;place-items:center}
+#game{width:100%;height:100%;max-height:none;min-height:0;aspect-ratio:auto;object-fit:contain;position:absolute;inset:0}
+#shift-view canvas{position:absolute;inset:0;width:100%;height:100%;object-fit:fill}
+#arcade-mode .touch{bottom:8px}
+#arcade-mode:not([data-state=playing]) .touch,#arcade-mode:not([data-state=playing]) #pause{display:none!important}
+.pit-strip{border:0;border-top:1px solid #4b5345}.pit-strip>div{flex:1;min-width:0}
+.pit-strip strong,.pit-strip small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pit-strip strong{font-size:12px}.pit-strip small{font-size:10px}.pit-strip .progress{margin-top:3px}
+.pit-strip button{font-size:11px}.pit-strip button span{display:block;font-size:9px}
+#overlay{z-index:3;gap:4px;padding:8px}
+#overlay h2{font-size:clamp(22px,10dvh,53px);margin:0}
+#overlay p{margin:1px 0;font-size:13px}
+#overlay .primary{min-height:44px;padding:7px 12px}
+.clockout{position:absolute;z-index:4;inset:0;display:grid;align-content:center;justify-items:center;gap:10px;background:#0e1519ed;padding:14px}
+.clockout h2,.clockout p{margin:0}
+#shift-view,#shift-view button,.shift-wheel,#arcade-mode .touch{touch-action:none}
+.shift-input button:active,.shift-input button[data-held]{background:#d7f75b;color:#1b2518}
+@media (orientation:landscape) and (max-height:550px){
+  #game{object-fit:fill}
+  #arcade-mode .hud small{font-size:8px}
+  #arcade-mode .hud b{font-size:20px}
+  .ticket{width:min(100%,560px);padding:10px 16px}
+  .ticket h1{font-size:32px;margin:5px 0}.ticket label{min-height:44px;padding:4px 8px}
+  .ticket .primary{margin:6px 0 2px}
+}
+
+#shift-board {
+  padding: max(8px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right))
+    max(8px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left));
+}
+.ticket {
+  width:min(100%,740px);
+  border:1px solid #b7b7a3;
+  border-radius:5px;
+  background-color:#eee9d4;
+  background-image:repeating-linear-gradient(0deg,transparent 0 23px,#55654a0c 23px 24px);
+}
+.ticket-brand {padding:0 0 8px; color:#31453c;}
+.ticket-body {display:grid;grid-template-columns:minmax(0,1fr) minmax(140px,.37fr);gap:18px;}
+.ticket h1 {margin:10px 0 8px;line-height:1;}
+.ticket fieldset {gap:4px;}
+.ticket legend,.punch-label {
+  font:700 11px ui-monospace,monospace;
+  text-transform:uppercase;
+  letter-spacing:.07em;
+}
+.ticket label {
+  min-height:48px;
+  border-radius:2px;
+  padding:5px 9px;
+}
+.ticket-punch {
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  border-left:1px dashed #778576;
+  padding:12px 0 6px 18px;
+  text-align:center;
+}
+.ticket-punch>strong {
+  display:block;
+  margin:7px 0 10px;
+  padding:4px 10px;
+  border:2px solid #485949;
+  color:#485949;
+  font:700 19px ui-monospace,monospace;
+  transform:rotate(-4deg);
+}
+.ticket-punch .primary {margin:8px 0 2px;min-height:48px;min-width:0;}
+.ticket-punch #sound {min-height:44px;border:0;color:#293830;padding:2px 10px;}
+.ticket-footer {padding-top:7px;color:#475348;}
+.rotate-hint {display:none;}
+@media (orientation:landscape) and (max-height:550px) {
+  .ticket {padding:10px 16px;}
+  .ticket h1 {font-size:clamp(28px,8.5dvh,42px);}
+}
+@media (orientation:portrait) and (max-width:550px) {
+  .ticket {width:min(100%,420px);}
+  .ticket-body {grid-template-columns:1fr;gap:12px;}
+  .ticket-punch {border-left:0;border-top:1px dashed #778576;padding:10px 0 0;}
+  .ticket-punch .punch-label,.ticket-punch>strong {display:none;}
+  .rotate-hint {display:block;margin:0;font-size:12px;color:#475348;}
+}
+
+/* Yard operator card */
+.ticket{background:#e7d8b7 url(assets/operator-reference.jpg) center/cover;position:relative;padding:11px 17px;overflow:hidden;isolation:isolate;border-radius:13px}
+.ticket::before{content:'';position:absolute;z-index:-1;inset:4px;background:#eee2c4f5;border-radius:9px}
+.ticket-brand{border-bottom:2px solid #302e26}
+.ticket-body{grid-template-columns:minmax(0,1fr) minmax(142px,.34fr);gap:13px}
+.ticket h1{font:italic 900 clamp(36px,8vw,66px)/.85 'Barlow Condensed',Impact,sans-serif;text-transform:uppercase;color:#252721;letter-spacing:.02em;margin:7px 0 6px}
+.ticket legend{width:100%;padding:4px 6px;background:#b9d542;color:#22291a;margin-bottom:2px}
+.ticket fieldset{gap:2px}.ticket label{min-height:39px;padding:3px 8px;background:#f0e5cd88;border:0;border-bottom:1px solid #70654c}
+.ticket label:has(input:checked){background:#dce58b}.ticket label strong{font-size:14px}.ticket label small{font-size:11px}
+.ticket-punch{border-left:1px solid #70654c;padding:4px 0 0 10px}
+.operator-art{width:min(100%,135px);aspect-ratio:1.18;background:url(assets/operator-reference.jpg) 3% 70%/345% auto no-repeat;mix-blend-mode:multiply}
+#training-stamp{border:2px solid #627638;color:#3a4d1d;padding:3px;transform:rotate(-4deg);text-align:center;font-size:9px}
+.ticket-punch .primary{margin:6px 0 0;min-height:44px}
+.ticket-punch #sound,.ticket-punch #open-workshop{min-height:34px;color:#303923;border:0;padding:2px 8px;font-size:12px;font-weight:700}
+#workshop{width:min(93vw,400px);border:2px solid #8a8f66;background:#eaddbc;color:#23271d;border-radius:6px;padding:15px}
+#workshop::backdrop{background:#111b}
+#workshop h2{margin:6px 0}
+#workshop button{min-height:44px;color:#222b16;border-color:#657653}
+#workshop button[data-buy]{display:block;width:100%;margin:4px 0}
+#workshop button[data-owned=true]::after{content:' · OWNED'}
+#workshop button:disabled{opacity:.56}
+.workshop-close{float:right}
+@media (orientation:landscape) and (max-height:360px){.ticket h1{font-size:33px}.ticket label{min-height:34px}.ticket label small{font-size:10px}.operator-art{width:100px}.ticket-footer{padding-top:3px}}
+@media (orientation:portrait) and (max-width:550px){.ticket-body{grid-template-columns:1fr}.operator-art{display:none}}
+.ticket{background:#eee2c4 url(assets/timesheet-paper.jpg) center top/580px 38px repeat}
+.ticket::before{background:linear-gradient(115deg,#5f3b171a,transparent 20%,transparent 78%,#684b2520)}
+.ticket h1{height:clamp(33px,12dvh,62px);width:min(100%,470px);background:url(assets/timesheet-wordmark.jpg) left center/contain no-repeat;color:transparent;mix-blend-mode:multiply}
+.shift-hud #dispatch-bearing{font:700 22px system-ui;line-height:1;color:var(--lime);min-width:26px;text-align:center}

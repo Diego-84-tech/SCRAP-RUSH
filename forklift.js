@@ -3,31 +3,54 @@
   const shift = document.getElementById('forklift-mode');
   const view = document.getElementById('shift-view');
   const objective = document.getElementById('shift-step');
-  const arcadeTab = document.getElementById('open-arcade');
-  const shiftTab = document.getElementById('open-forklift');
+  const bearing = document.getElementById('dispatch-bearing');
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
+  const board = document.getElementById('shift-board');
+  const ticket = document.getElementById('forklift-ticket');
+  document.addEventListener('contextmenu', event => {
+    if (document.body.classList.contains('on-shift')) event.preventDefault();
+  });
   let runtime;
+  let selectedShift = "forklift";
 
-  function switchMode(showShift) {
-    if (showShift && state === 'playing') pause();
-    releaseArcadeStick();
-    arcade.hidden = showShift;
-    shift.hidden = !showShift;
-    arcadeTab.setAttribute('aria-pressed', String(!showShift));
-    shiftTab.setAttribute('aria-pressed', String(showShift));
-    if (showShift && !runtime) {
-      try {
-        runtime = createShift();
-      } catch (error) {
-        objective.textContent = 'This browser could not start 3D. Arcade Yard is still available.';
-        console.warn(error);
-      }
-    }
+  function showBoard() {
+    if (!arcade.hidden && ['playing','paused'].includes(state) &&
+        !window.confirm('Leave the current shift?')) return;
+    stopArcade();
     runtime?.clear();
+    arcade.hidden = shift.hidden = true;
+    board.hidden = false;
+    document.body.classList.remove('on-shift');
+    document.getElementById('clock-in').focus({preventScroll:true});
   }
 
-  arcadeTab.onclick = () => switchMode(false);
-  shiftTab.onclick = () => switchMode(true);
-  document.getElementById('shift-reset').onclick = () => runtime?.reset();
+  document.getElementById('clock-in').onclick = () => {
+    const order = document.querySelector('input[name=order]:checked').value;
+    board.hidden = true;
+    document.body.classList.add('on-shift');
+    if (order !== 'forklift' && order !== 'dispatch') {
+      arcade.hidden = false;
+      openArcade(order);
+      return;
+    }
+    shift.hidden = false;
+    selectedShift = order;
+    document.getElementById("forklift-title").textContent = order === "dispatch" ? "Gate Dispatch" : "Forklift Training";
+    try {
+      runtime ??= createShift();
+      runtime.reset(selectedShift);
+    } catch (error) {
+      objective.textContent = '3D could not start. Return to the shift board to play Arcade Yard.';
+      console.warn(error);
+    }
+  };
+
+  for (const id of ['run-board','arcade-board','forklift-board','forklift-done']) {
+    document.getElementById(id).onclick = showBoard;
+  }
+  for (const id of ['shift-reset','forklift-again']) {
+    document.getElementById(id).onclick = () => runtime?.reset(selectedShift);
+  }
 
   function createShift() {
     const scene = new THREE.Scene();
@@ -145,7 +168,17 @@
       const scrap=metal(scene,.17,.12,.68,0x827878,-4.45+i*.2,.72,-2.66);
       scrap.rotation.y=(i%3-1)*.24;
     }
-    const targetZ = -9;
+    const trainingBay = {id:'03',x:0,z:-9};
+    const gates = {
+      '03':{id:'03',x:-2.85,z:-2},
+      '09':{id:'09',x:3.35,z:-9},
+      '01':{id:'01',x:2.8,z:2.2}
+    };
+    const orders = [
+      {from:'03',to:'09',label:'Red pallet R-04',color:0xd43d39},
+      {from:'09',to:'01',label:'Blue pallet B-02',color:0x479be5},
+      {from:'01',to:'03',label:'Amber pallet A-06',color:0xdca633}
+    ];
     const shade = document.createElement('canvas');
     shade.width = shade.height = 128;
     const shadowPaint = shade.getContext('2d');
@@ -158,10 +191,36 @@
       new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(shade),transparent:true,depthWrite:false}));
     cargoShadow.rotation.x=-Math.PI/2;
     scene.add(cargoShadow);
-    const targetColor = 0xbaf85d;
-    for(const x of [-1.32,1.32]) box(scene,.075,.012,2.05,targetColor,x,.012,targetZ);
-    for(const z of [targetZ-1,targetZ+1]) box(scene,2.7,.012,.075,targetColor,0,.012,z);
-    for(const x of [-.87,.87]) box(scene,.075,.012,2.3,0xfab84b,x,.013,1);
+    function drawBay(bay, numbered) {
+      const group = new THREE.Group();
+      group.position.set(bay.x,0,bay.z);
+      scene.add(group);
+      const color = 0xbaf85d;
+      const markings = [];
+      for (const x of [-1.20,1.20]) markings.push(box(group,.075,.012,2.05,color,x,.012,0));
+      for (const z of [-1,1]) markings.push(box(group,2.4,.012,.075,color,0,.012,z));
+      if (numbered) {
+        const sign = document.createElement('canvas');
+        sign.width = 256; sign.height = 96;
+        const text = sign.getContext('2d');
+        text.fillStyle='#242f32'; text.fillRect(0,0,256,96);
+        text.fillStyle='#d4ef87'; text.font='bold 51px system-ui'; text.textAlign='center';
+        text.fillText('GATE '+bay.id,128,66);
+        const signMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.9,.70),
+          new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(sign)}));
+        signMesh.position.set(0,1.95,-1.1);
+        group.add(signMesh);
+      }
+      return {group,markings};
+    }
+    const trainingOutline = drawBay(trainingBay,false);
+    const gateMeshes = Object.fromEntries(Object.values(gates).map(gate=>[gate.id,drawBay(gate,true)]));
+    const guideRails = [-.87,.87].map(x=>box(scene,.075,.012,2.3,0xfab84b,x,.013,1));
+    const bollard = box(scene,1.28,.85,2.2,0xc07c3a,0,.43,-4.5);
+    for (const x of [-.46,0,.46]) {
+      const stripe=box(scene,.16,.64,.04,0x302b26,x,.43,-3.38);
+      bollard.attach(stripe);
+    }
     for(const x of [-3.2,3.2]) {
       for(let z = 7; z > -14; z -= 1.5) box(scene,.055,.01,.55,0xe0a14c,x,.01,z);
     }
@@ -191,7 +250,7 @@
     for (const x of [-.63,0,.63]) {
       box(pallet,.024,.018,.022,0x41362f,x,.198,.438);
     }
-    for(const x of [-.39,.39]) box(pallet,.09,.65,.90,0xa4bd4a,x,.52,0);
+    const straps=[-.39,.39].map(x=>box(pallet,.09,.65,.90,0xa4bd4a,x,.52,0));
     box(pallet,.32,.15,.012,0x26332e,0,.55,.448);
 
     const vehicle = new THREE.Group();
@@ -223,6 +282,11 @@
     vehicle.add(workLight,workLight.target);
     const forks = new THREE.Group();
     vehicle.add(forks);
+    const forkGuides = [-.32,.32].map(x=>{
+      const guide=box(forks,.027,.012,.91,0xd7f75b,x,.032,-1.36);
+      guide.material.emissive.set(0x91a735);
+      return guide;
+    });
     box(forks,.89,.13,.08,0x4d5961,0,.08,-.77);
     for(const x of [-.32,.32]) {
       metal(forks,.135,.055,1.22,0xadb9bf,x,0,-1.40);
@@ -235,35 +299,83 @@
     const pointers = new Map();
     const keyMap = { ArrowUp:'forward',w:'forward',ArrowDown:'reverse',s:'reverse',ArrowLeft:'left',a:'left',ArrowRight:'right',d:'right',r:'lift',f:'lower' };
     const down = name => keyboard.has(name) || inputs.has(name);
-    let yaw, height, seated, carried, complete, lastFrame;
+    let yaw, height, seated, carried, complete, lastFrame, renderedWidth, renderedHeight;
+    let dispatch=false, orderIndex=0, target=trainingBay, reachedPickup=false;
     const offset = new THREE.Vector3();
     const local = new THREE.Vector3();
 
     function clear() {
       keyboard.clear();
       inputs.clear();
+      for (const [id,button] of pointers) {
+        if (button.hasPointerCapture(id)) button.releasePointerCapture(id);
+        delete button.dataset.held;
+      }
       pointers.clear();
       releaseWheel();
     }
 
-    function reset() {
+    function activateOrder() {
+      const order=orders[orderIndex];
+      const source=gates[order.from];
+      target=gates[order.to];
+      pallet.position.set(source.x,0,source.z);
+      pallet.rotation.y=0;
+      carried=complete=seated=reachedPickup=false;
+      for(const strap of straps) strap.material.color.set(order.color);
+      objective.textContent='NEXT JOB · GO TO GATE '+order.from;
+    }
+
+    function reset(selection='forklift') {
       clear();
-      yaw = 0;
-      height = .09;
-      seated = carried = complete = false;
-      vehicle.position.set(0,0,4);
-      vehicle.rotation.y = 0;
-      forks.position.y = height;
+      dispatch=selection==='dispatch';
+      bearing.hidden=!dispatch;
+      orderIndex=0;
+      yaw=0;
+      height=.09;
+      seated=carried=complete=false;
+      ticket.hidden=true;
+      vehicle.position.set(0,0,dispatch?5.6:4);
+      vehicle.rotation.y=0;
+      forks.position.y=height;
       pallet.position.set(0,0,0);
-      pallet.rotation.y = 0;
-      objective.textContent = 'Line up both forks with the pallet slots';
+      pallet.rotation.y=0;
+      target=trainingBay;
+      trainingOutline.group.visible=label.visible=!dispatch;
+      for(const rail of guideRails) rail.visible=!dispatch;
+      bollard.visible=dispatch;
+      for(const gate of Object.values(gateMeshes)) gate.group.visible=dispatch;
+      for(const guide of forkGuides) guide.visible=Boolean(progress.upgrades.guide);
+      workLight.intensity=progress.upgrades.lights?4.8:2.1;
+      for(const strap of straps) strap.material.color.set(0xa4bd4a);
+      objective.textContent='Line up both forks with the pallet slots';
+      if(dispatch) activateOrder();
+    }
+
+    function inDropZone() {
+      return Math.abs(pallet.position.x-target.x)<.48 &&
+        Math.abs(pallet.position.z-target.z)<.46 && Math.cos(yaw)>.96;
+    }
+    function clearOfBarrier(position) {
+      const margin=carried?1.4:.75;
+      return !dispatch || Math.abs(position.x)>.64+margin || Math.abs(position.z+4.5)>1.1+margin;
     }
 
     function relativePallet(position) {
       return local.copy(pallet.position).sub(position).applyAxisAngle(THREE.Object3D.DEFAULT_UP,-yaw);
     }
 
+    function forksSeated() {
+      const rel = relativePallet(vehicle.position);
+      return Math.abs(rel.x)<.12 && rel.z>-1.93 && rel.z<-1.62 &&
+        Math.cos(yaw-pallet.rotation.y)>.99 && height<.15 && pallet.position.y===0;
+    }
+
     function simulate(dt) {
+      if (!ticket.hidden) return;
+      const lifting = Number(down('lift')) - Number(down('lower'));
+      // Capture the pallet before reversing can pull the forks out of its slots.
+      if (lifting>0 && !carried && !complete && forksSeated()) carried = true;
       const throttle = Number(down('forward')) - Number(down('reverse'));
       const steer = updateWheel(dt, Number(down('left')) - Number(down('right')));
       yaw += steer * dt * throttle * 1.24;
@@ -279,15 +391,17 @@
         const forkSlot = aligned && height<.13;
         const reach = forkSlot ? 1.68 : 2.42;
         const blockedByPallet = !carried && Math.abs(rel.x)<1 && rel.z<-0.30 && rel.z>-reach;
-        if (!blockedByPallet || throttle<0) vehicle.position.copy(offset);
+        if ((!blockedByPallet || throttle<0) && clearOfBarrier(offset)) vehicle.position.copy(offset);
       }
 
       const rel = relativePallet(vehicle.position);
-      seated = !carried && Math.abs(rel.x)<.12 && rel.z>-1.93 && rel.z<-1.62 &&
-        Math.cos(yaw-pallet.rotation.y)>.99 && height<.15 && pallet.position.y===0;
-      const lifting = Number(down('lift')) - Number(down('lower'));
+      seated = !carried && forksSeated();
       if (seated && lifting>0 && !complete) carried = true;
-      height = clamp(height + lifting*dt*.42,.065,.95);
+      // A held Lift during the final forward approach waits for the forks to seat.
+      const liningUp = !carried && !complete && throttle>0 && lifting>0 &&
+        height<.13 && rel.z>-3 && rel.z<-1.62 &&
+        Math.abs(rel.x)<.12 && Math.cos(yaw-pallet.rotation.y)>.99;
+      if (!liningUp) height = clamp(height + lifting*dt*(progress.upgrades.hydraulics ? .65 : .42),.065,.95);
       forks.position.y = height;
       if (carried) {
         offset.set(0, Math.max(0,height-.09), -1.77).applyAxisAngle(THREE.Object3D.DEFAULT_UP,yaw);
@@ -295,25 +409,62 @@
         pallet.rotation.y = yaw;
         if (lifting<0 && height<=.09) {
           carried = false;
-          complete = Math.abs(pallet.position.x)<.48 &&
-            Math.abs(pallet.position.z-targetZ)<.46 && Math.cos(yaw)>.96;
+          complete = inDropZone();
         }
       }
 
       cargoShadow.position.set(pallet.position.x,.009,pallet.position.z);
       let message;
-      if (complete) message = rel.z < -2.2 ? 'Delivery complete' : 'Pallet delivered · reverse to clear the forks';
-      else if (carried) message = height>.32 ? 'Lower the load for travel' :
-        Math.abs(pallet.position.z-targetZ)<.46 && Math.abs(pallet.position.x)<.48 ?
-          'Lower the pallet inside Bay 03' : 'Carry low to the green outline in Bay 03';
-      else if (seated) message = 'Forks seated · lift the pallet';
-      else message = height>.13 ? 'Lower the forks to slot height' : 'Line up both forks with the pallet slots';
-      if (objective.textContent!==message) objective.textContent=message;
+      const order=orders[orderIndex];
+      const destination=dispatch?'Gate '+target.id:'Bay 03';
+      if (dispatch) {
+        const source = gates[order.from];
+        reachedPickup ||= Math.hypot(vehicle.position.x-source.x,vehicle.position.z-source.z)<3.15;
+        const active=carried||complete?order.to:order.from;
+        const waypoint=gates[active];
+        const radians=Math.atan2(waypoint.x-vehicle.position.x,vehicle.position.z-waypoint.z)+yaw;
+        bearing.style.transform=`rotate(${radians}rad)`;
+        for(const [id,gate] of Object.entries(gateMeshes)){
+          for(const mark of gate.markings) mark.material.color.set(id===active?0xbaf85d:0x58674b);
+        }
+      }
+      if (complete) {
+        message='Pallet delivered · reverse to clear the forks';
+        if (Math.hypot(rel.x,rel.z)>2.22) {
+          if (dispatch) progress.credits++;
+          else progress.trained=true;
+          saveProgress();
+          if(dispatch && orderIndex<orders.length-1){
+            orderIndex++;
+            activateOrder();
+            return;
+          }
+          clear();
+          message='Delivery complete';
+          document.getElementById('delivery-result').textContent=dispatch?
+            'Three gate deliveries completed. Earned 3 shift credits.':'One pallet delivered to Bay 03. Training qualified.';
+          ticket.hidden=false;
+        }
+      } else if (carried) {
+        message=height>.32?'Lower the load for travel · '+destination:
+          inDropZone()?'Lower the pallet inside '+destination:
+          dispatch?'DELIVER '+order.label.toUpperCase()+' TO '+destination.toUpperCase():'Carry low to the green outline in Bay 03';
+      } else if (seated) message='Forks seated · lift the pallet';
+      else if (height>.13) message='Lower the forks to slot height';
+      else if (dispatch) message=reachedPickup?'PICK UP '+order.label.toUpperCase():'NEXT JOB · GO TO GATE '+order.from;
+      else message='Line up both forks with the pallet slots';
+      if (objective.textContent!==message) {
+        objective.textContent=message;
+        if (dispatch && !reducedMotion.matches) {
+          objective.getAnimations().forEach(animation=>animation.cancel());
+          objective.animate([{opacity:.3,transform:'translateX(9px)'},{opacity:1,transform:'none'}],180);
+        }
+      }
     }
 
     window.addEventListener('keydown', event => {
       const action = keyMap[event.key];
-      if (shift.hidden || !action) return;
+      if (shift.hidden || !ticket.hidden || !action) return;
       event.preventDefault();
       keyboard.add(action);
     });
@@ -322,15 +473,20 @@
     document.addEventListener('visibilitychange', clear);
     view.querySelectorAll('[data-drive]').forEach(button => {
       button.addEventListener('pointerdown', event => {
+        if (event.button !== 0 || !ticket.hidden) return;
         event.preventDefault();
         button.setPointerCapture(event.pointerId);
-        pointers.set(event.pointerId,button.dataset.drive);
+        pointers.set(event.pointerId,button);
+        button.dataset.held = '';
         inputs.add(button.dataset.drive);
       });
       for(const name of ['pointerup','pointercancel','lostpointercapture']){
         button.addEventListener(name,event=>{
           pointers.delete(event.pointerId);
-          if (![...pointers.values()].includes(button.dataset.drive)) inputs.delete(button.dataset.drive);
+          if (![...pointers.values()].includes(button)) {
+            inputs.delete(button.dataset.drive);
+            delete button.dataset.held;
+          }
         });
       }
     });
@@ -341,7 +497,9 @@
       lastFrame = now;
       if (shift.hidden || document.hidden) return;
       const width = view.clientWidth, height = view.clientHeight;
-      if (width && height && camera.aspect!==width/height) {
+      if (width && height && (width!==renderedWidth || height!==renderedHeight)) {
+        renderedWidth = width;
+        renderedHeight = height;
         camera.aspect = width/height;
         camera.updateProjectionMatrix();
         renderer.setSize(width,height,false);
